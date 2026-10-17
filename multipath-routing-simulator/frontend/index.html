@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a2b">
+  <title>Network Reliability Simulator</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/assets/style.css">
+  <script defer src="/assets/topology.js"></script>
+  <script defer src="/assets/charts.js"></script>
+  <script defer src="/assets/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Network Reliability Simulator home">
+      <span class="brand-mark" aria-hidden="true">↗</span>
+      <span>NET<span class="brand-light">/</span>RELIABLE</span>
+    </a>
+    <div class="topbar-right">
+      <span class="live-dot"></span><span id="connection-state">Connecting to simulator</span>
+      <span class="version-tag">COURSE PROJECT</span>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">COMPUTER NETWORKS · SIMULATION LAB</p>
+        <h1>Network Reliability Simulator</h1>
+        <p class="subtitle">Explore how alternate routes help data reach its destination.</p>
+      </div>
+      <button class="button button-quiet" id="reset-button" type="button"><span aria-hidden="true">↺</span> Reset network</button>
+    </section>
+
+    <section class="metrics-grid" aria-label="Current experiment metrics">
+      <article class="metric-card"><div class="metric-label">PACKETS DELIVERED</div><div class="metric-value" id="delivered-value">—</div><div class="metric-note" id="sent-note">Run an experiment to begin</div></article>
+      <article class="metric-card"><div class="metric-label">DELIVERY RATIO</div><div class="metric-value" id="delivery-value">—</div><div class="metric-note">Unique packets received</div></article>
+      <article class="metric-card"><div class="metric-label">ACTIVE ROUTES</div><div class="metric-value" id="routes-value">—</div><div class="metric-note">Available source to destination paths</div></article>
+      <article class="metric-card"><div class="metric-label">RETRANSMISSIONS</div><div class="metric-value" id="retry-value">—</div><div class="metric-note">Retries after a missing acknowledgement</div></article>
+    </section>
+
+    <div class="content-grid">
+      <section class="panel controls-panel">
+        <div class="panel-heading"><div><p class="eyebrow">EXPERIMENT SETUP</p><h2>Transmission controls</h2></div><span class="step-number">01</span></div>
+        <form id="experiment-form">
+          <div class="field-row">
+            <label class="field">Source<select id="source-select" required></select></label>
+            <span class="direction-arrow" aria-hidden="true">→</span>
+            <label class="field">Destination<select id="destination-select" required></select></label>
+          </div>
+          <label class="field">Message<textarea id="message-input" rows="3" maxlength="800" required>Reliable data transmission</textarea><span class="field-hint">Split into numbered packets before sending.</span></label>
+          <label class="field">Routing mode<select id="mode-select"><option value="multipath">Multipath · distribute over alternatives</option><option value="single">Single path · use the lowest-cost route</option><option value="congestion_aware">Congestion-aware · adapt to delay and estimated link load</option></select><span class="field-hint">Congestion-aware mode re-scores routes for each packet using link delay and prior simulated transmissions, adjusted by link capacity.</span></label>
+          <div class="field-row">
+            <label class="field">Packet size <span class="input-suffix">characters</span><input id="packet-size" type="number" min="1" max="64" value="8"></label>
+            <label class="field">Alternate routes <span class="input-suffix">max</span><input id="route-count" type="number" min="1" max="3" value="2"></label>
+          </div>
+          <label class="field">Packet loss <output id="loss-output">0%</output><input id="loss-range" type="range" min="0" max="60" value="0"><span class="field-hint">A lost packet is retried until acknowledged or retries run out.</span></label>
+          <div class="failure-box">
+            <label class="check-row"><input id="scheduled-failure" type="checkbox"><span><strong>Schedule a link failure</strong><small>Take a link down during this transmission.</small></span></label>
+            <div class="field-row failure-fields" id="scheduled-fields" hidden>
+              <label class="field">Link to fail<select id="failure-link"></select></label>
+              <label class="field">After transmissions<input id="failure-after" type="number" min="0" value="3"></label>
+            </div>
+          </div>
+          <div class="form-actions"><button class="button button-primary" type="submit"><span aria-hidden="true">▶</span> Run experiment</button><button class="button button-outline" id="compare-button" type="button">Compare modes</button></div>
+        </form>
+        <div class="divider"></div>
+        <div class="panel-subheading"><div><p class="eyebrow">LINK STATE</p><h3>Manual link control</h3></div></div>
+        <div class="field-row manual-link-row"><label class="field"><span class="sr-only">Select link</span><select id="manual-link"></select></label><button class="button button-small button-outline" id="toggle-link" type="button">Break link</button></div>
+        <p class="field-hint">A manual outage stays active until you restore the link or reset the network.</p>
+      </section>
+
+      <section class="panel topology-panel">
+        <div class="panel-heading"><div><p class="eyebrow">LIVE TOPOLOGY</p><h2>Network map</h2></div><div class="map-count" id="topology-count">Loading…</div></div>
+        <details class="topology-editor">
+          <summary>Load or edit a topology</summary>
+          <div class="topology-editor-body">
+            <p>Update the JSON below and apply it. Each node needs an <code>id</code>; each link needs <code>source</code>, <code>target</code>, and positive <code>cost</code>. Delay and capacity are optional.</p>
+            <textarea id="topology-json" rows="9" spellcheck="false" aria-label="Topology JSON"></textarea>
+            <button class="button button-small button-outline" id="load-topology" type="button">Apply topology</button>
+          </div>
+        </details>
+        <div class="map-legend"><span><i class="legend-dot source-dot"></i> Source / destination</span><span><i class="legend-line route-one"></i> Route 1</span><span><i class="legend-line route-two"></i> Route 2</span><span><i class="legend-line link-down"></i> Link down</span></div>
+        <div class="topology-wrap" id="topology-wrap"><div class="loading-state">Loading network topology…</div></div>
+        <div class="route-summary" id="route-summary"><span class="muted">Run an experiment to highlight selected routes.</span></div>
+      </section>
+    </div>
+
+    <section class="results-grid">
+      <section class="panel results-panel">
+        <div class="panel-heading"><div><p class="eyebrow">EXPERIMENT OUTPUT</p><h2>Performance</h2></div><span class="result-badge" id="result-mode">NO RUN YET</span></div>
+        <div id="comparison-view" class="comparison-view"><p class="empty-state">Run a simulation to see delivery, latency, throughput, and recovery measurements.</p></div>
+        <div class="integrity-row" id="integrity-row" hidden></div>
+      </section>
+      <section class="panel message-panel">
+        <div class="panel-heading"><div><p class="eyebrow">DESTINATION</p><h2>Reassembled message</h2></div><span id="integrity-pill" class="status-pill status-idle">WAITING</span></div>
+        <div id="received-message" class="received-message empty-message">The reconstructed message will appear here after delivery.</div>
+        <div class="checksum-line" id="checksum-line"></div>
+      </section>
+    </section>
+
+    <section class="bottom-grid">
+      <section class="panel table-panel">
+        <div class="panel-heading"><div><p class="eyebrow">SEQUENCE TRACKING</p><h2>Packet outcomes</h2></div><span class="subtle-count" id="packet-count">0 packets</span></div>
+        <div class="table-scroll"><table><thead><tr><th>SEQ</th><th>PAYLOAD</th><th>STATUS</th><th>ROUTE</th><th>DELAY</th></tr></thead><tbody id="packet-rows"><tr><td colspan="5" class="table-empty">Packet outcomes appear after a simulation.</td></tr></tbody></table></div>
+      </section>
+      <section class="panel event-panel">
+        <div class="panel-heading"><div><p class="eyebrow">SIMULATION TIMELINE</p><h2>Event log</h2></div><span class="subtle-count" id="event-count">0 events</span></div>
+        <ol class="event-list" id="event-list"><li class="event-empty">Transmission and recovery events appear here.</li></ol>
+      </section>
+    </section>
+    <footer class="footer-note"><span>SIMULATED NETWORK · NO PHYSICAL TRAFFIC SENT</span><span>Multipath Routing for Reliable Data Transmission</span></footer>
+  </main>
+</body>
+</html>
